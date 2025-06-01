@@ -4,7 +4,17 @@ MCPHost is a command-line interface (CLI) tool built with Java 21. It acts as an
 
 The project is designed to be lightweight and performant, with support for GraalVM Native Image compilation for fast startup and reduced memory footprint.
 
+### How to use
+
+```bash
+java -jar ./build/libs/java-mcphost-0.1.0-SNAPSHOT.jar -m qwen3:8b --config /Users/bruno/Developer/workspaces/claude/java-mcphost/mcp.json 
+```
+
+
 ## Table of Contents
+
+
+
 
 - [Features](#features)
 - [Architecture](#architecture)
