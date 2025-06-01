@@ -7,7 +7,7 @@ The project is designed to be lightweight and performant, with support for Graal
 ### How to use
 
 ```bash
-java -jar ./build/libs/java-mcphost-0.1.0-SNAPSHOT.jar -m qwen3:8b --config /Users/bruno/Developer/workspaces/claude/java-mcphost/mcp.json 
+java -jar ./build/libs/java-mcphost-0.1.0-SNAPSHOT.jar -m qwen3:8b --config ~/mcp.json 
 ```
 
 
