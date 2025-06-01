@@ -1,0 +1,25 @@
+@startuml ChatDirectResponseSequence
+
+actor User
+participant "Main CLI" as Main
+participant "LoadingAnimator" as Animator
+participant "OllamaApiClient" as OllamaClient
+participant "Ollama Server" as OllamaSrv <<External System>>
+
+User -> Main : enters prompt
+Main -> Main : add prompt to conversationHistory
+Main -> Animator : start("LLM is thinking...")
+activate Animator
+Main -> OllamaClient : chat(ChatRequest with history & tools)
+    activate OllamaClient
+    OllamaClient -> OllamaSrv : POST /api/chat
+        activate OllamaSrv
+        OllamaSrv --> OllamaClient : ChatResponse (text only)
+        deactivate OllamaSrv
+    OllamaClient --> Main : ChatResponse
+    deactivate OllamaClient
+Main -> Animator : stop()
+deactivate Animator
+Main -> Main : add LLM response to history
+Main -> User : displays LLM text response
+@enduml

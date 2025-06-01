@@ -1,0 +1,97 @@
+plugins {
+    id 'java'
+    id 'application'
+    id 'org.graalvm.buildtools.native' version '0.10.1'
+}
+
+group = 'com.example'
+version = '0.1.0-SNAPSHOT'
+
+repositories {
+    mavenCentral()
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+dependencies {
+    // MCP SDK
+    implementation 'io.modelcontextprotocol.sdk:mcp:0.10.0'
+
+    // CLI Argument Parsing
+    implementation 'info.picocli:picocli:4.7.6'
+    annotationProcessor 'info.picocli:picocli-codegen:4.7.6'
+
+    // JSON Processing
+    implementation 'com.fasterxml.jackson.core:jackson-databind:2.17.0'
+    implementation 'com.fasterxml.jackson.core:jackson-annotations:2.17.0'
+    implementation 'com.fasterxml.jackson.core:jackson-core:2.17.0'
+
+    // Testing
+    testImplementation platform('org.junit:junit-bom:5.10.0')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+
+    // Logging - SLF4J API and Logback Classic Implementation
+    implementation 'org.slf4j:slf4j-api:2.0.12'
+    implementation 'ch.qos.logback:logback-classic:1.5.6'
+    implementation 'ch.qos.logback:logback-core:1.5.6'
+
+}
+
+application {
+    mainClass = 'com.brunorozendo.mcphost.Main'
+}
+
+// Configure the jar task to create a fat JAR
+jar {
+    manifest {
+        attributes(
+                'Main-Class': application.mainClass.get()
+        )
+    }
+    // This will include all runtime dependencies into the JAR.
+    // For more complex scenarios (e.g., resource conflicts), consider the Shadow JAR plugin.
+    from {
+        configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }
+    }
+    // Prevent duplicate file entries, common with fat JARs
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+
+    // Optional: Set a classifier for the fat JAR to distinguish it from a regular JAR
+    // archiveClassifier = 'fat'
+}
+
+
+graalvmNative {
+    agent {
+        defaultMode = "conditional"
+        modes {
+            conditional {
+                metadataCopy {
+                    mergeWithExisting = true
+                    inputTaskNames.add("test") // Use tests to gather metadata
+                    outputDirectories.add("src/main/resources/META-INF/native-image")
+                }
+            }
+        }
+    }
+    binaries {
+        main {
+            imageName = 'mcphost'
+            mainClass = application.mainClass.get()
+            buildArgs.add('--verbose')
+            buildArgs.add('-H:+ReportExceptionStackTraces')
+        }
+    }
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+}
+
+tasks.named('compileJava', JavaCompile) {
+    options.compilerArgs.add('-Apicocli.nativeImage=true')
+}

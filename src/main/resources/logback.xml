@@ -1,0 +1,27 @@
+<configuration>
+
+    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <appender name="CLI_OUTPUT" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%msg%n</pattern> <!-- Only the message for CLI interaction -->
+        </encoder>
+    </appender>
+
+    <logger name="com.brunorozendo.mcphost.Main.CLI" level="INFO" additivity="false">
+        <appender-ref ref="CLI_OUTPUT"/>
+    </logger>
+
+    <logger name="com.brunorozendo.mcphost" level="ERROR"/> <!-- Default level for your app -->
+    <logger name="io.modelcontextprotocol" level="ERROR"/> <!-- Adjust MCP SDK logging -->
+
+
+    <root level="ERROR"> <!-- Root logger level for external libraries -->
+        <appender-ref ref="STDOUT"/>
+    </root>
+
+</configuration>

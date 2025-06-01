@@ -1,0 +1,64 @@
+@startuml ChatToolCallSequence
+
+actor User
+participant "Main CLI" as Main
+participant "LoadingAnimator" as Animator
+participant "OllamaApiClient" as OllamaClient
+participant "Ollama Server" as OllamaSrv <<External System>>
+participant "McpToolClientManager" as McpManager
+participant "MCP Server Process" as McpServerP <<External Process>>
+
+User -> Main : enters prompt
+Main -> Main : add prompt to conversationHistory
+
+' First call to LLM
+Main -> Animator : start("LLM is thinking...")
+activate Animator
+Main -> OllamaClient : chat(ChatRequest with history & tools)
+    activate OllamaClient
+    OllamaClient -> OllamaSrv : POST /api/chat
+        activate OllamaSrv
+        OllamaSrv --> OllamaClient : ChatResponse (with tool_calls)
+        deactivate OllamaSrv
+    OllamaClient --> Main : ChatResponse
+    deactivate OllamaClient
+Main -> Animator : stop()
+deactivate Animator
+
+Main -> Main : add LLM response (with tool_calls) to history
+Main -> User : displays "LLM -> Tool Call: ..."
+
+' Tool Execution
+Main -> Animator : start("Executing tool <tool_name>...")
+activate Animator
+Main -> McpManager : callTool(toolName, arguments)
+    activate McpManager
+    McpManager -> McpServerP : MCPClient.callTool(CallToolRequest)
+        activate McpServerP
+        McpServerP --> McpManager : CallToolResult
+        deactivate McpServerP
+    McpManager --> Main : CallToolResult
+    deactivate McpManager
+Main -> Animator : stop()
+deactivate Animator
+
+Main -> User : displays "Tool -> Result: ..."
+Main -> Main : add tool result to conversationHistory
+
+' Second call to LLM (with tool result)
+Main -> Animator : start("LLM is processing tool result...")
+activate Animator
+Main -> OllamaClient : chat(ChatRequest with updated history)
+    activate OllamaClient
+    OllamaClient -> OllamaSrv : POST /api/chat
+        activate OllamaSrv
+        OllamaSrv --> OllamaClient : ChatResponse (final text response)
+        deactivate OllamaSrv
+    OllamaClient --> Main : ChatResponse
+    deactivate OllamaClient
+Main -> Animator : stop()
+deactivate Animator
+
+Main -> Main : add final LLM response to history
+Main -> User : displays final LLM text response
+@enduml

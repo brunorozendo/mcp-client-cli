@@ -1,0 +1,37 @@
+@startuml StartupSequence
+actor User
+participant "Main CLI" as Main
+participant "McpConfigLoader" as ConfigLoader
+participant "mcp.json" as ConfigFile
+participant "McpToolClientManager" as McpManager
+participant "MCP Server Process" as McpServerP <<process>>
+participant "OllamaApiClient" as OllamaClient
+
+User -> Main : launches mcphost-v5 with args
+Main -> ConfigLoader : load(configFile)
+ConfigLoader -> ConfigFile : reads
+ConfigFile --> ConfigLoader : configData
+ConfigLoader --> Main : mcpConfig
+
+Main -> McpManager : initializeClients(mcpConfig)
+activate McpManager
+loop for each MCP server in mcpConfig
+    McpManager -> McpServerP : starts process (via SDK's StdioTransport)
+    activate McpServerP
+    McpManager -> McpServerP : MCPClient.initialize()
+    McpServerP --> McpManager : InitializeResult
+    McpManager -> McpServerP : MCPClient.listTools()
+    McpServerP --> McpManager : ListToolsResult
+    deactivate McpServerP
+end
+McpManager --> Main : (initialization complete)
+deactivate McpManager
+
+Main -> OllamaClient : new OllamaApiClient(ollamaUrl)
+OllamaClient --> Main : (instance created)
+
+Main -> McpManager : getAllTools()
+McpManager --> Main : List<McpSchema.Tool>
+Main -> Main : convertMcpToolsToOllamaTools()
+Main --> User : "Interactive chat started..."
+@enduml

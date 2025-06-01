@@ -1,0 +1,77 @@
+@startuml OllamaClassDiagram
+!theme vibrant
+
+class Main {
+  - ollamaApiClient: OllamaApiClient
+  + convertMcpToolsToOllamaTools(List<McpSchema.Tool>): List<OllamaApi.Tool>
+}
+
+class OllamaApiClient {
+  - baseUrl: String
+  - httpClient: HttpClient
+  - objectMapper: ObjectMapper
+  + chat(OllamaApi.ChatRequest): OllamaApi.ChatResponse
+}
+
+package "com.example.mcphost.OllamaApi" <<POJOs>> {
+  class ChatRequest {
+    - model: String
+    - messages: List<Message>
+    - tools: List<Tool>
+  }
+  class ChatResponse {
+    - message: Message
+    - done: boolean
+  }
+  class Message {
+    - role: String
+    - content: String
+    - tool_calls: List<ToolCall>
+  }
+  class ToolCall {
+    - function: FunctionCall
+  }
+  class FunctionCall {
+    - name: String
+    - arguments: Map<String, Object>
+  }
+  class Tool {
+    - type: String
+    - function: OllamaFunction
+  }
+  class OllamaFunction {
+    - name: String
+    - description: String
+    - parameters: JsonSchema
+  }
+  class JsonSchema {
+    - type: String
+    - description: String
+    - properties: Map<String, JsonSchema>
+    - items: JsonSchema
+    - required: List<String>
+    - enumValues: List<Object>
+    - format: String
+  }
+}
+
+Main --> OllamaApiClient
+OllamaApiClient ..> OllamaApi.ChatRequest : uses
+OllamaApiClient ..> OllamaApi.ChatResponse : uses
+
+OllamaApi.ChatRequest *-- "*" OllamaApi.Message : contains
+OllamaApi.ChatRequest *-- "*" OllamaApi.Tool : contains
+OllamaApi.ChatResponse *-- "1" OllamaApi.Message : contains
+OllamaApi.Message *-- "*" OllamaApi.ToolCall : contains
+OllamaApi.ToolCall *-- "1" OllamaApi.FunctionCall : contains
+OllamaApi.Tool *-- "1" OllamaApi.OllamaFunction : contains
+OllamaApi.OllamaFunction *-- "1" OllamaApi.JsonSchema : parameters
+
+' Refined relationships for JsonSchema
+' A JsonSchema (object type) can have multiple properties, each being a JsonSchema.
+OllamaApi.JsonSchema "1" *-- "0..*" OllamaApi.JsonSchema : properties >
+' A JsonSchema (array type) has one 'items' schema.
+OllamaApi.JsonSchema "1" *-- "0..1" OllamaApi.JsonSchema : items >
+
+
+@enduml
