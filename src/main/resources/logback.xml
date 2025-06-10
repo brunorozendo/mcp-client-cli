@@ -12,12 +12,13 @@
         </encoder>
     </appender>
 
-    <logger name="com.brunorozendo.mcphost.Main.CLI" level="INFO" additivity="false">
-        <appender-ref ref="CLI_OUTPUT"/>
-    </logger>
 
     <logger name="com.brunorozendo.mcphost" level="ERROR"/> <!-- Default level for your app -->
     <logger name="io.modelcontextprotocol" level="ERROR"/> <!-- Adjust MCP SDK logging -->
+
+    <logger name="CLI" level="INFO" additivity="false">
+        <appender-ref ref="CLI_OUTPUT"/>
+    </logger>
 
 
     <root level="ERROR"> <!-- Root logger level for external libraries -->

@@ -1,10 +1,10 @@
 {
   "mcpServers": {
-    "filesystem": {
-      "command": "npx",
+    "bruno-filesystem": {
+      "command": "java",
       "args": [
-        "-y",
-        "@modelcontextprotocol/server-filesystem",
+        "-jar",
+        "/Users/bruno/Developer/workspaces/claude/java-mcp-filesystem-server/build/libs/filesystem-mcp-server-all.jar",
         "/Users/bruno/Developer/workspaces/claude"
       ]
     }
