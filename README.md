@@ -1,97 +1,256 @@
-# MCPHost: LLM Tool Orchestration CLI
+# MCPHost
 
-MCPHost is a command-line interface (CLI) tool built with Java 21. It acts as an orchestrator between Large Language Models (LLMs) accessed via the Ollama API and external tools exposed via the Model Context Protocol (MCP). This enables LLMs to leverage capabilities provided by various MCP-compliant servers, such as file system operations, calculations, or interactions with other APIs.
+MCPHost is a Java-based bridge that connects Large Language Models (LLMs) with Model Context Protocol (MCP) servers, enabling LLMs to interact with external tools, resources, and prompts through a standardized protocol.
 
-The project is designed to be lightweight and performant, with support for GraalVM Native Image compilation for fast startup and reduced memory footprint.
+## Overview
 
-### How to use
+MCPHost acts as an intermediary between:
+- **LLMs** (currently supporting Ollama models)
+- **MCP Servers** that provide tools, resources, and prompts
 
-```bash
-java -jar ./build/libs/java-mcphost-v5-0.1.0-SNAPSHOT.jar -m qwen3:8b --config ~/mcp.json 
-```
-
-
-## Table of Contents
-
-
-
-
-- [Features](#features)
-- [Architecture](#architecture)
-- [Key Concepts](#key-concepts)
-- [Prerequisites](#prerequisites)
-- [Building the Application](#building-the-application)
-    - [Fat JAR](#fat-jar)
-    - [Native Executable](#native-executable)
-- [Running MCPHost](#running-mcphost)
-    - [CLI Options](#cli-options)
-- [Configuration (`mcp.json`)](#configuration-mcpjson)
-- [Project Structure](#project-structure)
-- [Development Notes](#development-notes)
-    - [Logging](#logging)
-    - [Schema Conversion](#schema-conversion)
-- [Future Enhancements](#future-enhancements)
+This allows you to enhance your LLM interactions with custom functionality provided by MCP-compliant servers, such as filesystem operations, API integrations, or any custom tools you develop.
 
 ## Features
 
-*   **LLM Integration:** Connects to LLMs via the Ollama API.
-*   **MCP Tool Integration:** Dynamically discovers and utilizes tools from MCP servers.
-*   **Tool Calling Orchestration:** Manages the multi-turn conversation flow when an LLM decides to use a tool.
-*   **STDIO Transport for MCP:** Communicates with MCP servers launched as separate processes using standard input/output.
-*   **Interactive CLI:** Provides a chat interface for users to interact with the LLM.
-*   **Configurable:** MCP servers are defined in an external `mcp.json` file.
-*   **Loading Animation:** Visual feedback during long-running operations.
-*   **Structured Logging:** Uses Logback for configurable application logging.
-*   **Native Image Support:** Can be compiled into a fast-starting native executable using GraalVM.
-*   **`<think>` Tag Handling:** Displays "thought processes" from the LLM or user during loading animations if enclosed in `<think>...</think>` tags.
+- 🔌 **MCP Protocol Support**: Full compatibility with Model Context Protocol specification
+- 🤖 **Ollama Integration**: Native support for Ollama-hosted models
+- 🛠️ **Tool Execution**: Execute MCP tools and return results to the LLM
+- 📚 **Resource Access**: Query and retrieve MCP resources
+- 💬 **Interactive Chat**: Built-in interactive chat interface
+- ⚡ **Concurrent Connections**: Support for multiple MCP servers simultaneously
+- 🔧 **Flexible Configuration**: JSON-based configuration for easy setup
+- 📝 **Comprehensive Logging**: Built-in logging with Logback
+
+## Requirements
+
+- Java 21 or higher
+- Ollama installed and running (for LLM inference)
+- One or more MCP-compliant servers
+
+## Installation
+
+### Building from Source
+
+1. Clone the repository:
+```bash
+git clone <repository-url>
+cd MCPHost
+```
+
+2. Build the project using Gradle:
+```bash
+./gradlew build
+```
+
+3. The executable JAR will be created in `build/libs/`
+
+### Using Pre-built Distributions
+
+After building, you can find distribution packages in `build/distributions/`:
+- `MCPHost-0.1.0-SNAPSHOT.zip`
+- `MCPHost-0.1.0-SNAPSHOT.tar`
+
+Extract either package and use the scripts in the `bin/` directory.
+
+## Configuration
+
+Create an `mcp.json` configuration file to define your MCP servers:
+
+```json
+{
+  "mcpServers": {
+    "filesystem-server": {
+      "command": "java",
+      "args": [
+        "-jar",
+        "/path/to/filesystem-mcp-server.jar",
+        "/path/to/allowed/directory"
+      ]
+    },
+    "another-server": {
+      "command": "python",
+      "args": [
+        "/path/to/mcp_server.py"
+      ],
+      "env": {
+        "API_KEY": "your-api-key"
+      }
+    }
+  },
+  "globalSettings": {
+    "defaultTimeout": 30000,
+    "enableDebugLogging": false,
+    "maxConcurrentConnections": 10
+  }
+}
+```
+
+### Configuration Options
+
+- **mcpServers**: Map of MCP server configurations
+  - **command**: The executable command to run the server
+  - **args**: Command line arguments for the server
+  - **env**: Environment variables (optional)
+- **globalSettings**: Optional global configuration
+  - **defaultTimeout**: Timeout for MCP operations in milliseconds
+  - **enableDebugLogging**: Enable verbose debug logging
+  - **maxConcurrentConnections**: Maximum number of concurrent MCP connections
+
+## Usage
+
+### Basic Usage
+
+Run MCPHost with the required parameters:
+
+```bash
+java -jar MCPHost-0.1.0-SNAPSHOT.jar \
+  --model "qwen:7b" \
+  --config /path/to/mcp.json
+```
+
+### Command Line Options
+
+- `-m, --model`: LLM model name (required)
+  - Format: `model:tag` for Ollama (e.g., `qwen:7b`, `llama3:8b`)
+  - Can include `ollama:` prefix (e.g., `ollama:qwen:7b`)
+- `--config`: Path to the mcp.json configuration file (required)
+- `--ollama-base-url`: Base URL for Ollama API (default: `http://localhost:11434`)
+- `-h, --help`: Show help message
+- `-V, --version`: Show version information
+
+### Interactive Chat
+
+Once started, MCPHost provides an interactive chat interface:
+
+1. Type your message and press Enter
+2. The LLM will process your request and may call MCP tools if needed
+3. Tool results are automatically fed back to the LLM
+4. Type `exit` or `quit` to end the session
+
+### Example Session
+
+```
+✅ Interactive chat started. Type 'exit' or 'quit' to end.
+============================================================
+
+You: What files are in the current directory?
+
+LLM: I'll check the current directory for you.
+
+LLM -> Tool Call: list_directory | Args: {path: "."}
+
+Tool -> Result: Found 15 files and directories...
+
+LLM: The current directory contains 15 items including...
+
+You: exit
+
+============================================================
+Chat session ended.
+```
 
 ## Architecture
 
-MCPHost comprises several key components:
+### Components
 
-1.  **Main CLI (<code>Main.java</code>):**
-    *   Parses command-line arguments using Picocli.
-    *   Orchestrates the overall application flow, including initialization and the interactive chat loop.
-2.  **MCP Configuration (<code>McpConfig.java</code>, <code>McpConfigLoader.java</code>):**
-    *   Loads and parses the `mcp.json` file which defines the MCP servers to connect to.
-3.  **MCP Tool Client Manager (<code>McpToolClientManager.java</code>):**
-    *   Manages connections to MCP servers using the [MCP Java SDK](https://github.com/modelcontextprotocol/java-sdk).
-    *   Initializes `McpAsyncClient` instances for each configured server.
-    *   Discovers tools exposed by these servers.
-    *   Provides a unified interface to execute discovered tools.
-4.  **Ollama API Client (<code>OllamaApiClient.java</code>, <code>OllamaApi.java</code>):**
-    *   Communicates with a running Ollama instance.
-    *   Sends chat requests, including the list of available tools (converted from MCP format).
-    *   Processes Ollama responses, handling both direct text replies and tool call requests.
-5.  **Loading Animator (<code>LoadingAnimator.java</code>):**
-    *   Provides a simple text-based loading animation in the console during waits.
+1. **Main**: Entry point and CLI argument parsing using picocli
+2. **McpConnectionManager**: Manages connections to multiple MCP servers
+3. **ChatController**: Orchestrates the chat loop and tool execution
+4. **OllamaApiClient**: Handles communication with Ollama API
+5. **SchemaConverter**: Converts between MCP and Ollama tool formats
+6. **SystemPromptBuilder**: Builds system prompts with available tools/resources
 
-The general data flow involves the user providing a prompt, MCPHost sending it to Ollama with available tool definitions, Ollama potentially requesting a tool call, MCPHost executing the tool via the appropriate MCP server, and then sending the tool's result back to Ollama for a final response.
+### Flow
 
-*(For detailed diagrams, please refer to the full HTML documentation or generate them from the provided PlantUML sources.)*
+1. Load configuration from `mcp.json`
+2. Initialize connections to all configured MCP servers
+3. Fetch available tools, resources, and prompts from MCP servers
+4. Convert MCP tools to Ollama-compatible format
+5. Start interactive chat session
+6. Process user messages through LLM
+7. Execute requested tools via MCP servers
+8. Feed results back to LLM for response generation
 
-## Key Concepts
+## Development
 
-*   **Model Context Protocol (MCP):** A standard for AI models to interact with external tools and context. MCPHost acts as an MCP client to various MCP servers. See [modelcontextprotocol.org](https://modelcontextprotocol.org/).
-*   **Ollama:** A platform for running LLMs locally. MCPHost uses Ollama's API, particularly its tool/function calling capabilities. See [ollama.com](https://ollama.com/).
-*   **Tool Calling:** A mechanism where an LLM can request the execution of an external function (a "tool") to gather information or perform an action.
-*   **Picocli:** A Java library for creating command-line applications with ease.
-*   **Logback:** A logging framework used for structured application logging.
-*   **GraalVM Native Image:** Technology to compile Java applications into standalone native executables.
+### Project Structure
 
-## Prerequisites
+```
+MCPHost/
+├── src/main/java/com/brunorozendo/mcphost/
+│   ├── Main.java                    # Entry point
+│   ├── SchemaConverter.java         # MCP-Ollama schema conversion
+│   ├── control/                     # Controllers
+│   │   ├── ChatController.java      # Chat orchestration
+│   │   ├── McpConnectionManager.java # MCP connection management
+│   │   └── SystemPromptBuilder.java # System prompt generation
+│   ├── model/                       # Data models
+│   │   ├── McpConfig.java          # Configuration model
+│   │   └── OllamaApi.java          # Ollama API models
+│   ├── service/                     # Services
+│   │   ├── McpConfigLoader.java    # Configuration loading
+│   │   └── OllamaApiClient.java    # Ollama API client
+│   └── util/                        # Utilities
+│       └── LoadingAnimator.java     # CLI loading animation
+├── build.gradle                     # Gradle build configuration
+└── mcp.json                        # Example configuration
+```
 
-*   Java Development Kit (JDK) 21 or later.
-*   Gradle (uses wrapper, will download automatically).
-*   A running Ollama instance (default: `http://localhost:11434`) with the desired model(s) pulled (e.g., `ollama pull qwen2:7b`).
-*   MCP servers (defined in `mcp.json`) must be executable. For example, if using Node.js based MCP servers like `@modelcontextprotocol/server-filesystem`, ensure Node.js and `npx` are installed.
+### Building Native Image (GraalVM)
 
-## Building the Application
+The project includes GraalVM Native Image support:
 
-Clone the repository and navigate to the project root directory.
-
-### Fat JAR
-
-To build an executable JAR file that includes all dependencies:
 ```bash
-./gradlew jar
+./gradlew nativeCompile
+```
+
+This creates a native executable at `build/native/nativeCompile/mcphost`.
+
+## Logging
+
+MCPHost uses SLF4J with Logback for logging. Configure logging in `src/main/resources/logback.xml`.
+
+Log levels:
+- **INFO**: General operational messages
+- **DEBUG**: Detailed debugging information
+- **ERROR**: Error conditions
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+## License
+
+[Include your license information here]
+
+## Acknowledgments
+
+- Built with the [Model Context Protocol SDK](https://github.com/modelcontextprotocol)
+- CLI interface powered by [picocli](https://picocli.info/)
+- JSON processing with [Jackson](https://github.com/FasterXML/jackson)
+
+## Troubleshooting
+
+### Common Issues
+
+1. **Ollama connection failed**: Ensure Ollama is running and accessible at the specified URL
+2. **MCP server failed to start**: Check the command and arguments in your `mcp.json`
+3. **Tool execution timeout**: Increase `defaultTimeout` in global settings
+
+### Debug Mode
+
+Enable debug logging for troubleshooting:
+
+```json
+{
+  "globalSettings": {
+    "enableDebugLogging": true
+  }
+}
+```
+
+Or set the log level in `logback.xml`.
