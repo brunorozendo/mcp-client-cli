@@ -1,8 +1,7 @@
 package com.brunorozendo.mcphost.control;
 
-import com.brunorozendo.mcphost.SchemaConverter;
 import com.brunorozendo.mcphost.model.OllamaApi;
-import com.brunorozendo.mcphost.service.OllamaApiClient;
+import com.brunorozendo.mcphost.service.llm.LlmApiClient;
 import com.brunorozendo.mcphost.util.LoadingAnimator;
 import io.modelcontextprotocol.spec.McpSchema;
 import org.slf4j.Logger;
@@ -27,17 +26,17 @@ public class ChatController {
     private static final Logger cliLogger = LoggerFactory.getLogger("CLI");
     private static final Pattern THINK_TAG_PATTERN = Pattern.compile("<think>(.*?)</think>", Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
 
-    private final String ollamaModelName;
-    private final OllamaApiClient ollamaApiClient;
+    private final String modelName;
+    private final LlmApiClient llmApiClient;
     private final McpConnectionManager mcpConnectionManager;
     private final LoadingAnimator animator;
     private final List<OllamaApi.Tool> ollamaTools;
     private final List<OllamaApi.Message> conversationHistory = new ArrayList<>();
 
-    public ChatController(String ollamaModelName, OllamaApiClient ollamaApiClient, McpConnectionManager mcpConnectionManager,
+    public ChatController(String modelName, LlmApiClient llmApiClient, McpConnectionManager mcpConnectionManager,
                           LoadingAnimator animator, String systemPrompt, List<OllamaApi.Tool> ollamaTools) {
-        this.ollamaModelName = ollamaModelName;
-        this.ollamaApiClient = ollamaApiClient;
+        this.modelName = modelName;
+        this.llmApiClient = llmApiClient;
         this.mcpConnectionManager = mcpConnectionManager;
         this.animator = animator;
         this.ollamaTools = ollamaTools;
@@ -97,7 +96,7 @@ public class ChatController {
             requiresFollowUp = false;
 
             // 1. Call the LLM with the current conversation history
-            OllamaApi.ChatResponse chatResponse = callOllama(userInput);
+            OllamaApi.ChatResponse chatResponse = callLlm(userInput);
             if (chatResponse == null || chatResponse.message() == null) {
                 cliLogger.error("LLM: (No response received due to an API error)");
                 break; // Exit the loop on API error
@@ -118,9 +117,9 @@ public class ChatController {
         } while (requiresFollowUp);
     }
 
-    private OllamaApi.ChatResponse callOllama(String userInput) {
+    private OllamaApi.ChatResponse callLlm(String userInput) {
         OllamaApi.ChatRequest chatRequest = new OllamaApi.ChatRequest(
-                ollamaModelName,
+                modelName,
                 new ArrayList<>(conversationHistory), // Send a copy
                 false,
                 ollamaTools.isEmpty() ? null : ollamaTools
@@ -129,10 +128,10 @@ public class ChatController {
         String thinkingMessage = extractThinkingMessage(userInput, "LLM is thinking...");
         animator.start(thinkingMessage);
         try {
-            return ollamaApiClient.chat(chatRequest);
+            return llmApiClient.chat(chatRequest);
         } catch (Exception e) {
-            logger.error("Error communicating with Ollama API: {}", e.getMessage(), e);
-            cliLogger.error("LLM: (Error communicating with API: {})", e.getMessage());
+            logger.error("Error communicating with {} API: {}", llmApiClient.getProviderName(), e.getMessage(), e);
+            cliLogger.error("LLM: (Error communicating with {} API: {})", llmApiClient.getProviderName(), e.getMessage());
             return null;
         } finally {
             animator.stop();

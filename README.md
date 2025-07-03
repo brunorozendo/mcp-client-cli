@@ -5,7 +5,10 @@ MCPHost is a Java-based bridge that connects Large Language Models (LLMs) with M
 ## Overview
 
 MCPHost acts as an intermediary between:
-- **LLMs** (currently supporting Ollama models)
+- **LLMs** supporting:
+  - Ollama models
+  - Hugging Face Text Generation Inference (TGI)
+  - llama.cpp server (OpenAI-compatible API)
 - **MCP Servers** that provide tools, resources, and prompts
 
 This allows you to enhance your LLM interactions with custom functionality provided by MCP-compliant servers, such as filesystem operations, API integrations, or any custom tools you develop.
@@ -13,7 +16,7 @@ This allows you to enhance your LLM interactions with custom functionality provi
 ## Features
 
 - 🔌 **MCP Protocol Support**: Full compatibility with Model Context Protocol specification
-- 🤖 **Ollama Integration**: Native support for Ollama-hosted models
+- 🤖 **Multiple LLM Providers**: Support for Ollama, Hugging Face TGI, and llama.cpp server
 - 🛠️ **Tool Execution**: Execute MCP tools and return results to the LLM
 - 📚 **Resource Access**: Query and retrieve MCP resources
 - 💬 **Interactive Chat**: Built-in interactive chat interface
@@ -24,7 +27,10 @@ This allows you to enhance your LLM interactions with custom functionality provi
 ## Requirements
 
 - Java 21 or higher
-- Ollama installed and running (for LLM inference)
+- One of the following LLM providers:
+  - Ollama installed and running
+  - Hugging Face TGI server running
+  - llama.cpp server with OpenAI-compatible API
 - One or more MCP-compliant servers
 
 ## Installation
@@ -34,7 +40,7 @@ This allows you to enhance your LLM interactions with custom functionality provi
 1. Clone the repository:
 ```bash
 git clone <repository-url>
-cd MCPHost
+cd mcp-client-cli
 ```
 
 2. Build the project using Gradle:
@@ -47,8 +53,8 @@ cd MCPHost
 ### Using Pre-built Distributions
 
 After building, you can find distribution packages in `build/distributions/`:
-- `MCPHost-0.1.0-SNAPSHOT.zip`
-- `MCPHost-0.1.0-SNAPSHOT.tar`
+- `mcp-client-cli-0.1.0-SNAPSHOT.zip`
+- `mcp-client-cli-0.1.0-SNAPSHOT.tar`
 
 Extract either package and use the scripts in the `bin/` directory.
 
@@ -103,20 +109,80 @@ Create an `mcp.json` configuration file to define your MCP servers:
 Run MCPHost with the required parameters:
 
 ```bash
-java -jar MCPHost-0.1.0-SNAPSHOT.jar \
-  --model "qwen:7b" \
+# Using Ollama
+java -jar mcp-client-cli-0.1.0-SNAPSHOT.jar \
+  --model "ollama:qwen2.5-coder:32b" \
   --config /path/to/mcp.json
+
+# Using Hugging Face TGI
+java -jar mcp-client-cli-0.1.0-SNAPSHOT.jar \
+  --model "huggingface:meta-llama/Llama-3.1-8B-Instruct" \
+  --config /path/to/mcp.json \
+  --base-url "http://localhost:8080" \
+  --api-key "your-hf-token"
+
+# Using llama.cpp server
+java -jar mcp-client-cli-0.1.0-SNAPSHOT.jar \
+  --model "llama-server:qwen2.5-coder:32b" \
+  --config /path/to/mcp.json \
+  --base-url "http://localhost:8080"
 ```
 
 ### Command Line Options
 
 - `-m, --model`: LLM model name (required)
-  - Format: `model:tag` for Ollama (e.g., `qwen:7b`, `llama3:8b`)
-  - Can include `ollama:` prefix (e.g., `ollama:qwen:7b`)
+  - Format varies by provider:
+    - Ollama: `ollama:model-name` or just `model-name` (e.g., `ollama:qwen2.5-coder:32b`)
+    - Hugging Face: `huggingface:model-name` or `hf:model-name` (e.g., `hf:meta-llama/Llama-3.1-8B-Instruct`)
+    - llama.cpp server: `llama-server:model-name` (e.g., `llama-server:qwen2.5-coder:32b`)
 - `--config`: Path to the mcp.json configuration file (required)
-- `--ollama-base-url`: Base URL for Ollama API (default: `http://localhost:11434`)
+- `--base-url`: Base URL for the LLM API
+  - Defaults:
+    - Ollama: `http://localhost:11434`
+    - Hugging Face/llama-server: `http://localhost:8080`
+- `--api-key`: API key for authentication (required for HuggingFace with auth)
+- `--hf-token`: HuggingFace token (alias for --api-key)
 - `-h, --help`: Show help message
 - `-V, --version`: Show version information
+
+### LLM Provider Examples
+
+#### Ollama
+```bash
+# Default Ollama setup
+java -jar mcp-client-cli.jar --model "ollama:llama3:8b" --config mcp.json
+
+# Custom Ollama URL
+java -jar mcp-client-cli.jar \
+  --model "ollama:mixtral:8x7b" \
+  --config mcp.json \
+  --base-url "http://remote-server:11434"
+```
+
+#### Hugging Face Text Generation Inference (TGI)
+```bash
+# Start TGI server first
+docker run --gpus all --shm-size 1g -p 8080:80 \
+  ghcr.io/huggingface/text-generation-inference:3.3.4 \
+  --model-id meta-llama/Llama-3.1-8B-Instruct
+
+# Connect with MCPHost
+java -jar mcp-client-cli.jar \
+  --model "hf:meta-llama/Llama-3.1-8B-Instruct" \
+  --config mcp.json \
+  --api-key $HF_TOKEN
+```
+
+#### llama.cpp Server
+```bash
+# Start llama.cpp server (example with Qwen model)
+llama-server -hf Qwen/Qwen3-32B-GGUF:Q5_K_M --jinja
+
+# Connect with MCPHost
+java -jar mcp-client-cli.jar \
+  --model "llama-server:qwen3-32b" \
+  --config mcp.json
+```
 
 ### Interactive Chat
 
@@ -154,29 +220,34 @@ Chat session ended.
 ### Components
 
 1. **Main**: Entry point and CLI argument parsing using picocli
-2. **McpConnectionManager**: Manages connections to multiple MCP servers
-3. **ChatController**: Orchestrates the chat loop and tool execution
-4. **OllamaApiClient**: Handles communication with Ollama API
-5. **SchemaConverter**: Converts between MCP and Ollama tool formats
-6. **SystemPromptBuilder**: Builds system prompts with available tools/resources
+2. **LlmApiClient**: Interface for LLM providers
+   - **OllamaApiClientImpl**: Ollama API implementation
+   - **HuggingFaceApiClient**: Hugging Face TGI implementation
+   - **LlamaServerApiClient**: llama.cpp server implementation
+3. **LlmApiClientFactory**: Factory for creating appropriate LLM clients
+4. **McpConnectionManager**: Manages connections to multiple MCP servers
+5. **ChatController**: Orchestrates the chat loop and tool execution
+6. **SchemaConverter**: Converts between MCP and Ollama tool formats
+7. **SystemPromptBuilder**: Builds system prompts with available tools/resources
 
 ### Flow
 
 1. Load configuration from `mcp.json`
-2. Initialize connections to all configured MCP servers
-3. Fetch available tools, resources, and prompts from MCP servers
-4. Convert MCP tools to Ollama-compatible format
-5. Start interactive chat session
-6. Process user messages through LLM
-7. Execute requested tools via MCP servers
-8. Feed results back to LLM for response generation
+2. Create appropriate LLM client based on model specification
+3. Initialize connections to all configured MCP servers
+4. Fetch available tools, resources, and prompts from MCP servers
+5. Convert MCP tools to LLM-compatible format
+6. Start interactive chat session
+7. Process user messages through LLM
+8. Execute requested tools via MCP servers
+9. Feed results back to LLM for response generation
 
 ## Development
 
 ### Project Structure
 
 ```
-MCPHost/
+mcp-client-cli/
 ├── src/main/java/com/brunorozendo/mcphost/
 │   ├── Main.java                    # Entry point
 │   ├── SchemaConverter.java         # MCP-Ollama schema conversion
@@ -189,7 +260,13 @@ MCPHost/
 │   │   └── OllamaApi.java          # Ollama API models
 │   ├── service/                     # Services
 │   │   ├── McpConfigLoader.java    # Configuration loading
-│   │   └── OllamaApiClient.java    # Ollama API client
+│   │   ├── OllamaApiClient.java    # Legacy Ollama client (deprecated)
+│   │   └── llm/                    # LLM client implementations
+│   │       ├── LlmApiClient.java   # LLM client interface
+│   │       ├── LlmApiClientFactory.java # Client factory
+│   │       ├── OllamaApiClientImpl.java # Ollama implementation
+│   │       ├── HuggingFaceApiClient.java # HF TGI implementation
+│   │       └── LlamaServerApiClient.java # llama.cpp implementation
 │   └── util/                        # Utilities
 │       └── LoadingAnimator.java     # CLI loading animation
 ├── build.gradle                     # Gradle build configuration
@@ -204,7 +281,7 @@ The project includes GraalVM Native Image support:
 ./gradlew nativeCompile
 ```
 
-This creates a native executable at `build/native/nativeCompile/mcphost`.
+This creates a native executable at `build/native/nativeCompile/mcp-client-cli`.
 
 ## Logging
 
@@ -237,9 +314,18 @@ Log levels:
 
 ### Common Issues
 
-1. **Ollama connection failed**: Ensure Ollama is running and accessible at the specified URL
+1. **LLM connection failed**: 
+   - Ensure your LLM provider is running and accessible at the specified URL
+   - Check that the base URL is correct for your provider
+   - For Hugging Face, ensure your API key is valid
+
 2. **MCP server failed to start**: Check the command and arguments in your `mcp.json`
+
 3. **Tool execution timeout**: Increase `defaultTimeout` in global settings
+
+4. **OpenAI API compatibility issues**: 
+   - Ensure your Hugging Face TGI or llama.cpp server version supports OpenAI-compatible endpoints
+   - For TGI, version 1.4.0+ is required for OpenAI compatibility
 
 ### Debug Mode
 

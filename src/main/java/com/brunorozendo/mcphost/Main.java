@@ -6,7 +6,8 @@ import com.brunorozendo.mcphost.control.SystemPromptBuilder;
 import com.brunorozendo.mcphost.model.McpConfig;
 import com.brunorozendo.mcphost.model.OllamaApi;
 import com.brunorozendo.mcphost.service.McpConfigLoader;
-import com.brunorozendo.mcphost.service.OllamaApiClient;
+import com.brunorozendo.mcphost.service.llm.LlmApiClient;
+import com.brunorozendo.mcphost.service.llm.LlmApiClientFactory;
 import com.brunorozendo.mcphost.util.LoadingAnimator;
 import io.modelcontextprotocol.spec.McpSchema;
 import org.slf4j.Logger;
@@ -19,7 +20,6 @@ import java.io.File;
 import java.io.PrintWriter;
 import java.util.List;
 import java.util.concurrent.Callable;
-import java.util.stream.Collectors;
 
 @Command(name = "mcphost", mixinStandardHelpOptions = true, version = "mcphost 1.0",
         description = "A host that connects Large Language Models with MCP-compliant servers (tools, resources, etc.).")
@@ -27,13 +27,31 @@ public class Main implements Callable<Integer> {
 
     private static final Logger logger = LoggerFactory.getLogger(Main.class);
 
-    @Option(names = {"-m", "--model"}, required = true, description = "LLM model name (e.g., 'ollama:qwen:7b' or just 'qwen:7b' for Ollama)")
+    @Option(names = {"-m", "--model"}, required = true, 
+            description = "LLM model name. Formats:\n" +
+                         "  - ollama:model-name (e.g., 'ollama:qwen2.5-coder:32b')\n" +
+                         "  - huggingface:model-name or hf:model-name (e.g., 'hf:meta-llama/Llama-3.1-8B-Instruct')\n" +
+                         "  - llama-server:model-name (e.g., 'llama-server:qwen2.5-coder:32b')\n" +
+                         "  - model-name (defaults to Ollama for backward compatibility)")
     private String llmModelFullName;
 
     @Option(names = {"--config"}, required = true, description = "Path to the mcp.json configuration file")
     private File mcpConfigFile;
 
-    @Option(names = {"--ollama-base-url"}, description = "Base URL for the Ollama API", defaultValue = "http://localhost:11434")
+    @Option(names = {"--base-url"}, description = "Base URL for the LLM API. Defaults:\n" +
+                                                  "  - Ollama: http://localhost:11434\n" +
+                                                  "  - HuggingFace/llama-server: http://localhost:8080")
+    private String baseUrl;
+
+    @Option(names = {"--api-key"}, description = "API key for authentication (required for HuggingFace with auth)")
+    private String apiKey;
+
+    @Option(names = {"--hf-token"}, description = "HuggingFace token (alias for --api-key)")
+    private String hfToken;
+
+    // Deprecated option for backward compatibility
+    @Option(names = {"--ollama-base-url"}, description = "Base URL for the Ollama API (deprecated, use --base-url)", 
+            hidden = true)
     private String ollamaBaseUrl;
 
     @Override
@@ -43,8 +61,17 @@ public class Main implements Callable<Integer> {
 
         logger.info("mcphost is starting...");
         logger.info("LLM Model: {}", llmModelFullName);
-        logger.info("Ollama API URL: {}", ollamaBaseUrl);
-        logger.info("MCP Config: {}", mcpConfigFile.getAbsolutePath());
+
+        // Handle deprecated option
+        if (ollamaBaseUrl != null && baseUrl == null) {
+            logger.warn("--ollama-base-url is deprecated. Please use --base-url instead.");
+            baseUrl = ollamaBaseUrl;
+        }
+
+        // Handle HF token alias
+        if (hfToken != null && apiKey == null) {
+            apiKey = hfToken;
+        }
 
         // 1. Load Configuration
         McpConfig mcpConfig = loadConfiguration(mcpConfigFile);
@@ -56,10 +83,21 @@ public class Main implements Callable<Integer> {
         McpConnectionManager mcpConnectionManager = new McpConnectionManager();
         mcpConnectionManager.initializeClients(mcpConfig);
 
-        // 3. Initialize Ollama API Client
-        String ollamaModelName = parseOllamaModelName(llmModelFullName);
-        OllamaApiClient ollamaApiClient = new OllamaApiClient(ollamaBaseUrl);
-        logger.info("Ollama API Client is targeting model: {}", ollamaModelName);
+        // 3. Initialize LLM API Client
+        LlmApiClient llmApiClient;
+        String modelName;
+        try {
+            llmApiClient = LlmApiClientFactory.createClient(llmModelFullName, baseUrl, apiKey);
+            modelName = LlmApiClientFactory.extractModelName(llmModelFullName);
+            logger.info("{} API Client initialized", llmApiClient.getProviderName());
+            logger.info("Target model: {}", modelName);
+            if (baseUrl != null) {
+                logger.info("API URL: {}", baseUrl);
+            }
+        } catch (IllegalArgumentException e) {
+            logger.error("Invalid model specification: {}", e.getMessage());
+            return 1;
+        }
 
         // 4. Register a shutdown hook to clean up resources
         registerShutdownHook(animator, mcpConnectionManager);
@@ -75,8 +113,8 @@ public class Main implements Callable<Integer> {
 
         // 7. Start the interactive chat
         ChatController chatController = new ChatController(
-                ollamaModelName,
-                ollamaApiClient,
+                modelName,
+                llmApiClient,
                 mcpConnectionManager,
                 animator,
                 systemPrompt,
@@ -96,13 +134,6 @@ public class Main implements Callable<Integer> {
             logger.error("Fatal: Failed to load MCP configuration from {}: {}", configFile.getAbsolutePath(), e.getMessage());
             return null;
         }
-    }
-
-    private String parseOllamaModelName(String llmModelString) {
-        if (llmModelString.startsWith("ollama:")) {
-            return llmModelString.substring("ollama:".length());
-        }
-        return llmModelString;
     }
 
     private void registerShutdownHook(LoadingAnimator animator, McpConnectionManager mcpConnectionManager) {
