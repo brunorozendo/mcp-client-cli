@@ -78,7 +78,7 @@ public class LlamaServerApiClient implements LlmApiClient {
         return "llama-server";
     }
 
-    private ObjectNode convertToOpenAiFormat(OllamaApi.ChatRequest request) {
+    private ObjectNode convertToOpenAiFormat(OllamaApi.ChatRequest request) throws Exception {
         ObjectNode openAiRequest = objectMapper.createObjectNode();
         
         // llama.cpp server doesn't use model name in the request
@@ -102,7 +102,11 @@ public class LlamaServerApiClient implements LlmApiClient {
                     tc.put("type", "function");
                     ObjectNode function = objectMapper.createObjectNode();
                     function.put("name", toolCall.function().name());
-                    function.set("arguments", objectMapper.valueToTree(toolCall.function().arguments()));
+                    
+                    // Convert arguments to JSON string as expected by OpenAI format
+                    String argsJson = objectMapper.writeValueAsString(toolCall.function().arguments());
+                    function.put("arguments", argsJson);
+                    
                     tc.set("function", function);
                     toolCalls.add(tc);
                 }

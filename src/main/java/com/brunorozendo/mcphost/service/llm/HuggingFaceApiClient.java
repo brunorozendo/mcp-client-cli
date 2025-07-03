@@ -85,7 +85,7 @@ public class HuggingFaceApiClient implements LlmApiClient {
         return "huggingface";
     }
 
-    private ObjectNode convertToOpenAiFormat(OllamaApi.ChatRequest request) {
+    private ObjectNode convertToOpenAiFormat(OllamaApi.ChatRequest request) throws Exception {
         ObjectNode openAiRequest = objectMapper.createObjectNode();
         
         // Model name - TGI uses "tgi" as the model identifier
@@ -109,7 +109,11 @@ public class HuggingFaceApiClient implements LlmApiClient {
                     tc.put("type", "function");
                     ObjectNode function = objectMapper.createObjectNode();
                     function.put("name", toolCall.function().name());
-                    function.set("arguments", objectMapper.valueToTree(toolCall.function().arguments()));
+                    
+                    // Convert arguments to JSON string as expected by OpenAI format
+                    String argsJson = objectMapper.writeValueAsString(toolCall.function().arguments());
+                    function.put("arguments", argsJson);
+                    
                     tc.set("function", function);
                     toolCalls.add(tc);
                 }
