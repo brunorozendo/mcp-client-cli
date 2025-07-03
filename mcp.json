@@ -1,12 +1,28 @@
 {
   "mcpServers": {
-    "bruno-filesystem": {
-      "command": "java",
+    "mcp-server-filesystem": {
+      "command": "/Users/bruno/Developer/workspaces/claude/mcp-server-filesystem/build/native/nativeCompile/mcp-server-filesystem",
       "args": [
-        "-jar",
-        "/Users/bruno/Developer/workspaces/claude/java-mcp-filesystem-server/build/libs/filesystem-mcp-server-all.jar",
         "/Users/bruno/Developer/workspaces/claude"
-      ]
+      ],
+      "env":{
+        "LOG_DIR":"/Users/bruno/Developer/workspaces/claude/mcp-client-cli/logs",
+        "LOG_LEVEL":"DEBUG"
+      }
+    },
+    "mcp-server-gradle": {
+      "command": "/Users/bruno/Developer/workspaces/claude/mcp-gradle-server/build/native/nativeCompile/mcp-server-gradle",
+      "env":{
+        "LOG_DIR":"/Users/bruno/Developer/workspaces/claude/mcp-client-cli/logs",
+        "LOG_LEVEL":"DEBUG"
+      }
+    },
+    "mcp-server-command": {
+      "command": "/Users/bruno/Developer/workspaces/claude/mcp-server-command/build/native/nativeCompile/mcp-server-command",
+      "env":{
+        "LOG_DIR":"/Users/bruno/Developer/workspaces/claude/mcp-client-cli/logs",
+        "LOG_LEVEL":"DEBUG"
+      }
     }
   }
 }

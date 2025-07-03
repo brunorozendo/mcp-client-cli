@@ -66,24 +66,18 @@ jar {
 
 
 graalvmNative {
-    agent {
-        defaultMode = "conditional"
-        modes {
-            conditional {
-                metadataCopy {
-                    mergeWithExisting = true
-                    inputTaskNames.add("test") // Use tests to gather metadata
-                    outputDirectories.add("src/main/resources/META-INF/native-image")
-                }
-            }
-        }
-    }
+    toolchainDetection = true
     binaries {
         main {
-            imageName = 'mcphost'
+            imageName = 'mcp-client-cli'
             mainClass = application.mainClass.get()
-            buildArgs.add('--verbose')
+            buildArgs.add('--no-fallback')
             buildArgs.add('-H:+ReportExceptionStackTraces')
+            buildArgs.add('--initialize-at-build-time=org.slf4j')
+            buildArgs.add('--initialize-at-build-time=ch.qos.logback')
+            buildArgs.add('--enable-https')
+            buildArgs.add('--enable-all-security-services')
+            // Configuration files will be picked up automatically from META-INF/native-image
         }
     }
 }
