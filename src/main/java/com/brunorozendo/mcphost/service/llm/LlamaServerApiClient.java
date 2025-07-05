@@ -173,7 +173,18 @@ public class LlamaServerApiClient implements LlmApiClient {
         if (schema.description() != null) {
             node.put("description", schema.description());
         }
-        if (schema.properties() != null) {
+
+        // For object types, always include properties field (even if empty)
+        if ("object".equals(schema.type())) {
+            ObjectNode properties = objectMapper.createObjectNode();
+            if (schema.properties() != null) {
+                for (Map.Entry<String, OllamaApi.JsonSchema> entry : schema.properties().entrySet()) {
+                    properties.set(entry.getKey(), convertJsonSchema(entry.getValue()));
+                }
+            }
+            node.set("properties", properties);
+        } else if (schema.properties() != null) {
+            // For non-object types, only add properties if they exist
             ObjectNode properties = objectMapper.createObjectNode();
             for (Map.Entry<String, OllamaApi.JsonSchema> entry : schema.properties().entrySet()) {
                 properties.set(entry.getKey(), convertJsonSchema(entry.getValue()));
