@@ -35,6 +35,7 @@ public class LlamaServerApiClient implements LlmApiClient {
 
         this.httpClient = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(30))
+                .version(HttpClient.Version.HTTP_1_1) // Force HTTP/1.1 to avoid HTTP/2 issues
                 .build();
 
         this.objectMapper = new ObjectMapper()
