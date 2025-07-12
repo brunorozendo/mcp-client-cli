@@ -1,6 +1,7 @@
 package com.brunorozendo.mcphost.control;
 
 import com.brunorozendo.mcphost.model.McpConfig;
+import com.brunorozendo.mcphost.validation.ToolParameterValidator;
 import io.modelcontextprotocol.client.McpAsyncClient;
 import io.modelcontextprotocol.client.McpClient;
 import io.modelcontextprotocol.client.transport.ServerParameters;
@@ -244,6 +245,21 @@ public class McpConnectionManager {
             String errorMsg = "Error: Client for tool '" + toolName + "' is not available or not initialized.";
             logger.error(errorMsg);
             return new McpSchema.CallToolResult(List.of(new McpSchema.TextContent(errorMsg)), true);
+        }
+
+        // Validate parameters before calling the tool
+        java.util.Optional<McpSchema.Tool> toolDefinition = getToolByName(toolName);
+        if (toolDefinition.isPresent()) {
+            ToolParameterValidator.ValidationResult validation = 
+                ToolParameterValidator.validateToolParameters(toolDefinition.get(), arguments);
+            
+            if (!validation.isValid()) {
+                String errorMsg = "Parameter validation failed for tool '" + toolName + "': " + validation.getFormattedError();
+                logger.error(errorMsg);
+                return new McpSchema.CallToolResult(List.of(new McpSchema.TextContent(errorMsg)), true);
+            }
+        } else {
+            logger.warn("Could not retrieve tool definition for '{}' to validate parameters. Proceeding with call.", toolName);
         }
 
         McpSchema.CallToolRequest request = new McpSchema.CallToolRequest(toolName, arguments);

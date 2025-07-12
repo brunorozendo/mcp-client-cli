@@ -89,3 +89,8 @@ tasks.named('test') {
 tasks.named('compileJava', JavaCompile) {
     options.compilerArgs.add('-Apicocli.nativeImage=true')
 }
+
+run {
+    standardInput = System.in
+    jvmArgs("--enable-native-access=ALL-UNNAME")
+}
